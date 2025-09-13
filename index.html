@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OFL Stats Portal</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0d1117;
+            color: #c9d1d9;
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1 {
+            text-align: center;
+            color: #58a6ff;
+            margin-bottom: 40px;
+        }
+        .stats-card {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .team-name {
+            font-size: 24px;
+            font-weight: bold;
+            color: #f0f6fc;
+            margin-bottom: 10px;
+        }
+        .score {
+            font-size: 48px;
+            font-weight: bold;
+        }
+        .away { color: #f85149; }
+        .home { color: #3fb950; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #30363d;
+        }
+        th {
+            background: #1c2128;
+            color: #f0f6fc;
+            font-weight: 600;
+        }
+        .download-btn {
+            background: #238636;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            text-decoration: none;
+            display: inline-block;
+            margin: 20px 0;
+        }
+        .download-btn:hover {
+            background: #2ea043;
+        }
+        #status {
+            text-align: center;
+            padding: 20px;
+            font-size: 18px;
+        }
+        .loading {
+            color: #58a6ff;
+        }
+        .error {
+            color: #f85149;
+        }
+        .success {
+            color: #3fb950;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>OFL Stats Portal</h1>
+        <div id="status" class="loading">Loading stats...</div>
+        <div id="content" style="display: none;">
+            <div class="stats-card">
+                <div id="gameTitle"></div>
+                <div id="teamStats"></div>
+                <div id="quarterlyScores"></div>
+            </div>
+            <a id="downloadBtn" class="download-btn" href="#" download>Download Full Stats CSV</a>
+            <div class="stats-card">
+                <h2>Player Statistics Preview</h2>
+                <div id="playerStats"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function loadStats() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const gistId = urlParams.get('id');
+            
+            if (!gistId) {
+                const data = localStorage.getItem('latestStats');
+                if (data) {
+                    displayStats(JSON.parse(data));
+                } else {
+                    document.getElementById('status').innerHTML = '<span class="error">No stats data found</span>';
+                }
+                return;
+            }
+
+            try {
+                const response = await fetch(`https://api.github.com/gists/${gistId}`);
+                const gist = await response.json();
+                
+                const statsFile = Object.values(gist.files).find(file => file.filename.endsWith('.json'));
+                if (statsFile) {
+                    const data = JSON.parse(statsFile.content);
+                    displayStats(data);
+                    localStorage.setItem('latestStats', JSON.stringify(data));
+                }
+            } catch (error) {
+                document.getElementById('status').innerHTML = '<span class="error">Error loading stats</span>';
+            }
+        }
+
+        function displayStats(data) {
+            document.getElementById('status').style.display = 'none';
+            document.getElementById('content').style.display = 'block';
+            
+            document.getElementById('gameTitle').innerHTML = `
+                <div class="team-name">${data.awayName} <span class="away score">${data.awayScore}</span></div>
+                <div class="team-name">${data.homeName} <span class="home score">${data.homeScore}</span></div>
+            `;
+            
+            document.getElementById('teamStats').innerHTML = `
+                <h3>Team Statistics</h3>
+                <table>
+                    <tr>
+                        <th>Stat</th>
+                        <th>${data.awayName}</th>
+                        <th>${data.homeName}</th>
+                    </tr>
+                    <tr>
+                        <td>Passing Yards</td>
+                        <td>${data.teamStats.away.passingYards}</td>
+                        <td>${data.teamStats.home.passingYards}</td>
+                    </tr>
+                    <tr>
+                        <td>Rushing Yards</td>
+                        <td>${data.teamStats.away.rushingYards}</td>
+                        <td>${data.teamStats.home.rushingYards}</td>
+                    </tr>
+                    <tr>
+                        <td>Total Plays</td>
+                        <td>${data.teamStats.away.totalPlays}</td>
+                        <td>${data.teamStats.home.totalPlays}</td>
+                    </tr>
+                    <tr>
+                        <td>Turnovers</td>
+                        <td>${data.teamStats.away.turnovers}</td>
+                        <td>${data.teamStats.home.turnovers}</td>
+                    </tr>
+                </table>
+            `;
+            
+            document.getElementById('quarterlyScores').innerHTML = `
+                <h3>Scoring by Quarter</h3>
+                <table>
+                    <tr>
+                        <th>Team</th>
+                        <th>Q1</th>
+                        <th>Q2</th>
+                        <th>Q3</th>
+                        <th>Q4</th>
+                        <th>OT</th>
+                        <th>Final</th>
+                    </tr>
+                    <tr>
+                        <td>${data.awayName}</td>
+                        <td>${data.quarterlyScores.away.Q1}</td>
+                        <td>${data.quarterlyScores.away.Q2}</td>
+                        <td>${data.quarterlyScores.away.Q3}</td>
+                        <td>${data.quarterlyScores.away.Q4}</td>
+                        <td>${data.quarterlyScores.away.OT}</td>
+                        <td><strong>${data.awayScore}</strong></td>
+                    </tr>
+                    <tr>
+                        <td>${data.homeName}</td>
+                        <td>${data.quarterlyScores.home.Q1}</td>
+                        <td>${data.quarterlyScores.home.Q2}</td>
+                        <td>${data.quarterlyScores.home.Q3}</td>
+                        <td>${data.quarterlyScores.home.Q4}</td>
+                        <td>${data.quarterlyScores.home.OT}</td>
+                        <td><strong>${data.homeScore}</strong></td>
+                    </tr>
+                </table>
+            `;
+            
+            const blob = new Blob([data.csvData], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const downloadBtn = document.getElementById('downloadBtn');
+            downloadBtn.href = url;
+            downloadBtn.download = data.fileName;
+            
+            const csvLines = data.csvData.split('\n');
+            const headers = csvLines[0].split(',');
+            const playerRows = csvLines.slice(1, 6);
+            
+            let tableHtml = '<table><tr>';
+            headers.slice(0, 8).forEach(header => {
+                tableHtml += `<th>${header}</th>`;
+            });
+            tableHtml += '</tr>';
+            
+            playerRows.forEach(row => {
+                if (row.trim()) {
+                    tableHtml += '<tr>';
+                    row.split(',').slice(0, 8).forEach(cell => {
+                        tableHtml += `<td>${cell}</td>`;
+                    });
+                    tableHtml += '</tr>';
+                }
+            });
+            tableHtml += '</table>';
+            tableHtml += '<p><em>Showing first 5 players. Download CSV for complete stats.</em></p>';
+            
+            document.getElementById('playerStats').innerHTML = tableHtml;
+        }
+
+        loadStats();
+    </script>
+</body>
+</html>
